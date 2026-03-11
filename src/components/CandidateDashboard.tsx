@@ -35,7 +35,7 @@ export function CandidateDashboard() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [applicationOpen, setApplicationOpen] = useState(false);
   const [myApplications, setMyApplications] = useState<Applicant[]>([]);
-  const [stats, setStats] = useState<ApplicationStats>({ applied: 0, shortlisted: 0, rejected: 0 });
+  const [stats, setStats] = useState<ApplicationStats>({ applied: 0, inProgress: 0, shortlisted: 0, rejected: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [selectedApplication, setSelectedApplication] = useState<{ job: Job; applicant: Applicant } | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -51,11 +51,12 @@ export function CandidateDashboard() {
       const newStats = apps.reduce(
         (acc, applicant) => {
           acc.applied++;
+          if (applicant.status === 'In Progress') acc.inProgress++;
           if (applicant.status === 'Shortlisted') acc.shortlisted++;
           if (applicant.status === 'Rejected') acc.rejected++;
           return acc;
         },
-        { applied: 0, shortlisted: 0, rejected: 0 },
+        { applied: 0, inProgress: 0, shortlisted: 0, rejected: 0 },
       );
       setStats(newStats);
     } catch (err) {
@@ -88,6 +89,7 @@ export function CandidateDashboard() {
     switch (status) {
       case 'Shortlisted': return <Badge variant="shortlisted">{status}</Badge>;
       case 'Rejected': return <Badge variant="rejected">{status}</Badge>;
+      case 'In Progress': return <Badge variant="secondary">{status}</Badge>;
       default: return <Badge variant="underReview">{status}</Badge>;
     }
   };
@@ -101,7 +103,8 @@ export function CandidateDashboard() {
   };
 
   const chartData = [
-    { name: 'Under Review', value: stats.applied - stats.shortlisted - stats.rejected, color: 'hsl(217, 91%, 60%)' },
+    { name: 'In Progress', value: stats.inProgress, color: 'hsl(45, 93%, 47%)' },
+    { name: 'Under Review', value: stats.applied - stats.inProgress - stats.shortlisted - stats.rejected, color: 'hsl(217, 91%, 60%)' },
     { name: 'Shortlisted', value: stats.shortlisted, color: 'hsl(142, 76%, 36%)' },
     { name: 'Rejected', value: stats.rejected, color: 'hsl(0, 84%, 60%)' },
   ].filter(d => d.value > 0);
@@ -198,6 +201,7 @@ export function CandidateDashboard() {
                   <TableHead>Job</TableHead>
                   <TableHead className="min-w-[130px]">Resume Score</TableHead>
                   <TableHead className="min-w-[130px]">Behavioural Score</TableHead>
+                  <TableHead className="min-w-[130px]">Combined Score</TableHead>
                   <TableHead className="min-w-[130px]">Fit Score</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Action</TableHead>
@@ -242,6 +246,22 @@ export function CandidateDashboard() {
                               </span>
                             </div>
                             <Progress value={applicant.behavioural_score} className="h-1.5 w-24" />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Pending</span>
+                        )}
+                      </TableCell>
+
+                      {/* Combined Score */}
+                      <TableCell>
+                        {applicant.combined_score != null ? (
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className={`font-semibold ${scoreColor(applicant.combined_score)}`}>
+                                {applicant.combined_score}%
+                              </span>
+                            </div>
+                            <Progress value={applicant.combined_score} className="h-1.5 w-24" />
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">Pending</span>

@@ -12,6 +12,11 @@ import {
   ResumeAnalysis,
   BehaviouralAnalysis,
   Applicant,
+  StartApplicationResponse,
+  ApplicationQuestionsResponse,
+  SubmitApplicationResponse,
+  ApplicationDetailResponse,
+  RankingResponse,
 } from '@/types';
 
 const BASE_URL = 'http://localhost:8000';
@@ -156,19 +161,44 @@ export const jobsAPI = {
 // ─── Applications API ─────────────────────────────────────────────────────────
 
 export const applicationsAPI = {
-  /** POST /api/applications/jobs/{job_id}/apply (candidate only) */
-  apply: async (
+  /** POST /api/applications/jobs/{job_id}/start — Step 1: Start application */
+  startApplication: async (
     jobId: string,
     candidateName: string,
-  ): Promise<{ success: boolean; applicant_id: string; applied_at: string }> => {
+  ): Promise<StartApplicationResponse> => {
     const formData = new FormData();
     formData.append('candidate_name', candidateName);
-    formData.append('job_id', jobId);
 
-    const response = await apiFetch(`/api/applications/jobs/${jobId}/apply`, {
+    const response = await apiFetch(`/api/applications/jobs/${jobId}/start`, {
       method: 'POST',
       body: formData,
     });
+    return response.json();
+  },
+
+  /** GET /api/applications/{application_id}/questions — Step 3: Get auto-generated questions */
+  getApplicationQuestions: async (
+    applicationId: string,
+  ): Promise<ApplicationQuestionsResponse> => {
+    const response = await apiFetch(`/api/applications/${applicationId}/questions`);
+    return response.json();
+  },
+
+  /** POST /api/applications/{application_id}/submit — Step 5: Finalise application */
+  submitApplication: async (
+    applicationId: string,
+  ): Promise<SubmitApplicationResponse> => {
+    const response = await apiFetch(`/api/applications/${applicationId}/submit`, {
+      method: 'POST',
+    });
+    return response.json();
+  },
+
+  /** GET /api/applications/{application_id} — Full application detail */
+  getApplicationDetail: async (
+    applicationId: string,
+  ): Promise<ApplicationDetailResponse> => {
+    const response = await apiFetch(`/api/applications/${applicationId}`);
     return response.json();
   },
 
@@ -215,14 +245,12 @@ export const applicationsAPI = {
 // ─── Resume API ───────────────────────────────────────────────────────────────
 
 export const resumeAPI = {
-  /** POST /api/resume/analyze — multipart form: jd_text + file + optional applicant_id */
-  analyze: async (file: File, jdText: string, applicantId?: string): Promise<ResumeAnalysis> => {
+  /** POST /api/resume/analyze — multipart form: job_id + file + applicant_id */
+  analyze: async (jobId: string, file: File, applicantId: string): Promise<ResumeAnalysis> => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('jd_text', jdText);
-    if (applicantId) {
-      formData.append('applicant_id', applicantId);
-    }
+    formData.append('job_id', jobId);
+    formData.append('applicant_id', applicantId);
 
     const response = await apiFetch('/api/resume/analyze', {
       method: 'POST',
@@ -231,9 +259,9 @@ export const resumeAPI = {
     return response.json();
   },
 
-  /** GET /api/resume/ranking */
-  getRanking: async (): Promise<Array<{ candidate_name: string; score: number; pdf: string }>> => {
-    const response = await apiFetch('/api/resume/ranking');
+  /** GET /api/resume/ranking?job_id={job_id} — Combined ranking */
+  getRanking: async (jobId: string): Promise<RankingResponse> => {
+    const response = await apiFetch(`/api/resume/ranking?job_id=${encodeURIComponent(jobId)}`);
     return response.json();
   },
 };
@@ -241,28 +269,34 @@ export const resumeAPI = {
 // ─── Behavioural API ──────────────────────────────────────────────────────────
 
 export const behaviouralAPI = {
-  /** POST /api/behavioural/analyze */
+  /** POST /api/behavioural/analyze — Step 4: Submit behavioural responses */
   analyze: async (
     candidateId: string,
     jobId: string,
+    applicantId: string,
     responses: Array<{ question_id: string; text: string }>,
   ): Promise<BehaviouralAnalysis> => {
     const response = await apiFetch('/api/behavioural/analyze', {
       method: 'POST',
-      body: JSON.stringify({ candidate_id: candidateId, job_id: jobId, responses }),
+      body: JSON.stringify({
+        candidate_id: candidateId,
+        job_id: jobId,
+        applicant_id: applicantId,
+        responses,
+      }),
     });
     return response.json();
   },
 };
 
-// ─── AI API ───────────────────────────────────────────────────────────────────
+// ─── AI API (Legacy/Standalone — NOT used in application flow) ────────────────
 
 export const aiAPI = {
-  /** POST /api/ai/generate-questions?job_description=... */
-  generateQuestions: async (jobDescription: string): Promise<string[]> => {
-    const params = new URLSearchParams({ job_description: jobDescription });
-    const response = await apiFetch(`/api/ai/generate-questions?${params.toString()}`, {
+  /** POST /api/ai/generate-questions — Standalone, not part of application flow */
+  generateQuestions: async (jobId: string, numQuestions?: number): Promise<string[]> => {
+    const response = await apiFetch('/api/ai/generate-questions', {
       method: 'POST',
+      body: JSON.stringify({ job_id: jobId, num_questions: numQuestions }),
     });
     const data = await response.json();
     return (data.questions as string[]) ?? [];

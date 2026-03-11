@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Job, ResumeAnalysis, BehaviouralAnalysis } from '@/types';
+import { Job, ResumeAnalysis, BehaviouralAnalysis, GeneratedQuestion, SubmitApplicationResponse } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { ArrowLeft, ArrowRight, Upload, Loader2, Clock, CheckCircle, AlertTriangle, Brain, FileText, TrendingUp, User, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { resumeAPI, applicationsAPI, behaviouralAPI, aiAPI } from '@/lib/api';
+import { resumeAPI, applicationsAPI, behaviouralAPI } from '@/lib/api';
 
 interface ApplicationFlowProps {
   job: Job | null;
@@ -26,12 +26,6 @@ interface ApplicationFlowProps {
 
 type Step = 'upload' | 'analysis' | 'behavioural' | 'submitting' | 'results';
 
-const FALLBACK_QUESTIONS = [
-  'Tell us about a challenging situation you handled at work and how you resolved it.',
-  'How do you handle pressure and tight deadlines?',
-  'Describe a failure you experienced and what you learned from it.',
-];
-
 export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowProps>(
   ({ job, open, onOpenChange, onSuccess }, ref) => {
     const { user } = useAuth();
@@ -41,10 +35,16 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
     const [resumeFile, setResumeFile] = useState<File | null>(null);
     const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(null);
     const [behaviouralResult, setBehaviouralResult] = useState<BehaviouralAnalysis | null>(null);
-    const [questions, setQuestions] = useState<string[]>([]);
-    const [answers, setAnswers] = useState<string[]>(['', '', '']);
+    const [submitResult, setSubmitResult] = useState<SubmitApplicationResponse | null>(null);
+    const [questions, setQuestions] = useState<GeneratedQuestion[]>([]);
+    const [answers, setAnswers] = useState<Record<string, string>>({});
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+
+    // Application state from backend
+    const [applicationId, setApplicationId] = useState<string | null>(null);
+    const [isStarting, setIsStarting] = useState(false);
 
     // Timer state
     const [timeLeft, setTimeLeft] = useState(180);
@@ -58,11 +58,15 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
         setResumeFile(null);
         setAnalysis(null);
         setBehaviouralResult(null);
+        setSubmitResult(null);
         setQuestions([]);
-        setAnswers(['', '', '']);
+        setAnswers({});
         setTimeLeft(180);
         setTimerActive(false);
         setTimeExpired(false);
+        setApplicationId(null);
+        setIsStarting(false);
+        setIsLoadingQuestions(false);
       }
     }, [open]);
 
@@ -101,93 +105,107 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
       }
     };
 
+    /** Step 1: Start application + Step 2: Upload & analyze resume */
     const handleAnalyzeResume = async () => {
-      if (!resumeFile || !job) return;
+      if (!resumeFile || !job || !user) return;
 
       setIsAnalyzing(true);
       try {
-        // Run resume analysis and AI question generation in parallel
-        const [result, generatedQuestions] = await Promise.all([
-          resumeAPI.analyze(resumeFile, job.description),
-          aiAPI.generateQuestions(job.description).catch(() => [] as string[]),
-        ]);
+        // Step 1: Start application (or resume existing in-progress one)
+        let appId = applicationId;
+        if (!appId) {
+          setIsStarting(true);
+          const startResult = await applicationsAPI.startApplication(job.id, user.username);
+          appId = startResult.application_id;
+          setApplicationId(appId);
+          setIsStarting(false);
+        }
+
+        // Step 2: Upload resume & analyze (passes applicant_id to link to application)
+        const result = await resumeAPI.analyze(job.id, resumeFile, appId);
         setAnalysis(result);
-        const finalQuestions = generatedQuestions.length > 0
-          ? generatedQuestions.slice(0, 5)
-          : FALLBACK_QUESTIONS;
-        setQuestions(finalQuestions);
-        setAnswers(new Array(finalQuestions.length).fill(''));
         setStep('analysis');
+
+        // Step 3: Fetch auto-generated questions (backend requires resume_score to exist)
+        setIsLoadingQuestions(true);
+        try {
+          const questionsData = await applicationsAPI.getApplicationQuestions(appId);
+          setQuestions(questionsData.questions);
+          const initialAnswers: Record<string, string> = {};
+          questionsData.questions.forEach(q => { initialAnswers[q.question_id] = ''; });
+          setAnswers(initialAnswers);
+        } catch (qErr) {
+          toast({
+            title: 'Could not load questions',
+            description: qErr instanceof Error ? qErr.message : 'Failed to fetch behavioural questions',
+            variant: 'destructive',
+          });
+        } finally {
+          setIsLoadingQuestions(false);
+        }
       } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Could not analyze resume';
+        const isDuplicate = msg.toLowerCase().includes('already') || msg.includes('409') || msg.includes('Conflict');
         toast({
-          title: 'Analysis failed',
-          description: error instanceof Error ? error.message : 'Could not analyze resume',
+          title: isDuplicate ? 'Already Applied' : 'Analysis failed',
+          description: isDuplicate ? 'You have already applied and submitted for this job.' : msg,
           variant: 'destructive',
         });
       } finally {
         setIsAnalyzing(false);
+        setIsStarting(false);
       }
     };
 
     const startBehavioural = () => {
+      if (questions.length === 0) {
+        toast({ title: 'No Questions', description: 'Questions have not been loaded yet.', variant: 'destructive' });
+        return;
+      }
       setStep('behavioural');
       setTimerActive(true);
     };
 
-    const handleAnswerChange = useCallback((index: number, value: string) => {
+    const handleAnswerChange = useCallback((questionId: string, value: string) => {
       if (timeExpired) return;
-      setAnswers(prev => {
-        const next = [...prev];
-        next[index] = value;
-        return next;
-      });
+      setAnswers(prev => ({ ...prev, [questionId]: value }));
     }, [timeExpired]);
 
+    /** Step 4: Submit behavioural responses + Step 5: Finalise application */
     const handleSubmit = async () => {
-      if (!job || !user) return;
+      if (!job || !user || !applicationId) return;
 
       setIsSubmitting(true);
       setStep('submitting');
 
       try {
-        // 1. Create the application record — returns applicant_id
-        const applyResult = await applicationsAPI.apply(job.id, user.username);
-        const applicantId = applyResult.applicant_id;
-
-        // 2. Write resume scores onto the new applicant record.
-        //    The backend caches resumes by MD5 hash so no re-parsing happens;
-        //    it simply saves resume_score / extracted_skills against applicant_id.
-        if (resumeFile) {
-          await resumeAPI
-            .analyze(resumeFile, job.description, applicantId)
-            .catch(err => console.warn('Resume score write-back failed (non-critical):', err));
-        }
-
-        // 3. Submit behavioural analysis — backend writes behavioural_score to applicant record
-        let bResult: BehaviouralAnalysis | null = null;
-        const responses = questions.map((q, i) => ({
-          question_id: `q${i + 1}`,
-          text: answers[i] || '',
+        // Step 4: Submit behavioural responses with proper question_ids
+        const responses = questions.map(q => ({
+          question_id: q.question_id,
+          text: answers[q.question_id] || '',
         }));
-        if (responses.length > 0) {
-          bResult = await behaviouralAPI
-            .analyze(user.id, job.id, responses)
-            .catch(err => { console.warn('Behavioural analysis failed (non-critical):', err); return null; });
-        }
 
+        let bResult: BehaviouralAnalysis | null = null;
+        if (responses.length > 0) {
+          bResult = await behaviouralAPI.analyze(user.id, job.id, applicationId, responses);
+        }
         setBehaviouralResult(bResult);
+
+        // Step 5: Finalise application
+        const finalResult = await applicationsAPI.submitApplication(applicationId);
+        setSubmitResult(finalResult);
+
         toast({
           title: 'Application Submitted!',
-          description: `Successfully applied. Application ID: ${applicantId}`,
+          description: `Successfully applied. Application ID: ${applicationId}`,
         });
         onSuccess();
         setStep('results');
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Failed to submit application';
-        const isDuplicate = msg.toLowerCase().includes('already') || msg.includes('409') || msg.includes('Conflict');
         toast({
-          title: isDuplicate ? 'Already Applied' : 'Submission Failed',
-          description: isDuplicate ? 'You have already applied to this job.' : msg,
+          title: 'Submission Failed',
+          description: msg,
           variant: 'destructive',
         });
         setStep('behavioural');
@@ -263,7 +281,7 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
                   {isAnalyzing ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Analyzing...
+                      {isStarting ? 'Starting...' : 'Analyzing...'}
                     </>
                   ) : (
                     <>Next <ArrowRight className="w-4 h-4" /></>
@@ -372,21 +390,35 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
                 </a>
               )}
 
-              <div className="bg-warning/5 rounded-lg p-4 border border-warning/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-5 h-5 text-warning" />
-                  <span className="font-semibold">Next Step</span>
+              {/* Questions loading status */}
+              {isLoadingQuestions ? (
+                <div className="bg-primary/5 rounded-lg p-4 border border-primary/20 flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  <span className="text-sm">Loading behavioural questions...</span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Complete the behavioural assessment to strengthen your application.
-                </p>
-              </div>
+              ) : questions.length > 0 ? (
+                <div className="bg-warning/5 rounded-lg p-4 border border-warning/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-5 h-5 text-warning" />
+                    <span className="font-semibold">Next Step</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Complete the behavioural assessment ({questions.length} questions) to strengthen your application.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-destructive/5 rounded-lg p-4 border border-destructive/20">
+                  <p className="text-sm text-muted-foreground">
+                    Failed to load behavioural questions. Please try again.
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => setStep('upload')}>
                   <ArrowLeft className="w-4 h-4" /> Back
                 </Button>
-                <Button className="flex-1" onClick={startBehavioural}>
+                <Button className="flex-1" onClick={startBehavioural} disabled={questions.length === 0 || isLoadingQuestions}>
                   Continue to Assessment <ArrowRight className="w-4 h-4" />
                 </Button>
               </div>
@@ -405,12 +437,12 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
               </div>
 
               <div className="space-y-4">
-                {(questions.length > 0 ? questions : FALLBACK_QUESTIONS).slice(0, 5).map((question, index) => (
-                  <div key={index} className="space-y-2">
-                    <Label className="text-sm font-medium">{question}</Label>
+                {questions.map((question, index) => (
+                  <div key={question.question_id} className="space-y-2">
+                    <Label className="text-sm font-medium">{index + 1}. {question.text}</Label>
                     <Textarea
-                      value={answers[index] ?? ''}
-                      onChange={(e) => handleAnswerChange(index, e.target.value)}
+                      value={answers[question.question_id] ?? ''}
+                      onChange={(e) => handleAnswerChange(question.question_id, e.target.value)}
                       disabled={timeExpired}
                       rows={3}
                       placeholder="Type your answer here..."
@@ -455,6 +487,33 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
                 <CheckCircle className="w-5 h-5" />
                 <span className="font-semibold">Application submitted successfully!</span>
               </div>
+
+              {/* Combined scores from submit response */}
+              {submitResult && (
+                <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold">Overall Fit Score</span>
+                    <span className="text-2xl font-bold text-primary">
+                      {Math.round(submitResult.combined_score)}%
+                    </span>
+                  </div>
+                  <Progress value={submitResult.combined_score} className="h-2" />
+                  <div className="grid grid-cols-3 gap-2 mt-3">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Resume</p>
+                      <p className="font-semibold text-sm">{Math.round(submitResult.resume_score)}%</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Behavioural</p>
+                      <p className="font-semibold text-sm">{Math.round(submitResult.behavioural_score * 100)}%</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Fit Score</p>
+                      <p className="font-semibold text-sm">{Math.round(submitResult.fit_score * 100)}%</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {behaviouralResult ? (
                 <>

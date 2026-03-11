@@ -18,10 +18,14 @@ type TimelineStep = {
 
 export const ApplicationTimeline: React.FC<ApplicationTimelineProps> = ({ applicant, className }) => {
   const getSteps = (): TimelineStep[] => {
+    const hasResume = applicant.resume_score != null;
+    const hasBehavioural = applicant.behavioural_score != null;
+    const isInProgress = applicant.status === 'In Progress';
+
     const baseSteps: TimelineStep[] = [
       {
         id: 'applied',
-        label: 'Application Submitted',
+        label: 'Application Started',
         icon: <Send className="w-4 h-4" />,
         status: 'completed',
         timestamp: applicant.applied_at
@@ -32,19 +36,19 @@ export const ApplicationTimeline: React.FC<ApplicationTimelineProps> = ({ applic
         id: 'resume',
         label: 'Resume Analyzed',
         icon: <FileText className="w-4 h-4" />,
-        status: 'completed',
+        status: hasResume ? 'completed' : (isInProgress ? 'current' : 'completed'),
       },
       {
         id: 'behavioural',
         label: 'Behavioural Assessment',
         icon: <Brain className="w-4 h-4" />,
-        status: 'completed',
+        status: hasBehavioural ? 'completed' : (hasResume && isInProgress ? 'current' : (isInProgress ? 'pending' : 'completed')),
       },
       {
         id: 'review',
         label: 'Under Review',
         icon: <Clock className="w-4 h-4" />,
-        status: applicant.status === 'Under Review' ? 'current' : 'completed',
+        status: isInProgress ? 'pending' : (applicant.status === 'Under Review' ? 'current' : 'completed'),
       },
     ];
 

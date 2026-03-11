@@ -53,12 +53,14 @@ export function ApplicantsDialog({ job, open, onOpenChange, onUpdate }: Applican
         return <Badge variant="shortlisted">{status}</Badge>;
       case 'Rejected':
         return <Badge variant="rejected">{status}</Badge>;
+      case 'In Progress':
+        return <Badge variant="secondary">{status}</Badge>;
       default:
         return <Badge variant="underReview">{status}</Badge>;
     }
   };
 
-  const sortedApplicants = [...applicants].sort((a, b) => (b.fit_score ?? 0) - (a.fit_score ?? 0));
+  const sortedApplicants = [...applicants].sort((a, b) => (b.combined_score ?? 0) - (a.combined_score ?? 0));
 
   const handleStatusUpdate = async (status: 'Shortlisted' | 'Rejected') => {
     if (!selectedApplicant) return;
@@ -106,7 +108,7 @@ export function ApplicantsDialog({ job, open, onOpenChange, onUpdate }: Applican
           <p className="text-muted-foreground">
             {selectedApplicant
               ? `Applied for ${job.title}`
-              : `${applicants.length} applicant${applicants.length !== 1 ? 's' : ''} for ${job.title} (ranked by fit score)`}
+              : `${applicants.length} applicant${applicants.length !== 1 ? 's' : ''} for ${job.title} (ranked by combined score)`}
           </p>
         </DialogHeader>
 
@@ -152,13 +154,23 @@ export function ApplicantsDialog({ job, open, onOpenChange, onUpdate }: Applican
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <p className={`text-2xl font-bold ${
+                            (applicant.combined_score ?? 0) >= 80 ? 'text-success' :
+                            (applicant.combined_score ?? 0) >= 60 ? 'text-primary' : 'text-warning'
+                          }`}>
+                            {applicant.combined_score ?? '—'}
+                            {applicant.combined_score != null ? '%' : ''}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Combined</p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-lg font-bold ${
                             (applicant.fit_score ?? 0) >= 80 ? 'text-success' :
                             (applicant.fit_score ?? 0) >= 60 ? 'text-primary' : 'text-warning'
                           }`}>
                             {applicant.fit_score ?? '—'}
                             {applicant.fit_score != null ? '%' : ''}
                           </p>
-                          <p className="text-xs text-muted-foreground">Fit Score</p>
+                          <p className="text-xs text-muted-foreground">Fit</p>
                         </div>
                         {getStatusBadge(applicant.status)}
                       </div>
@@ -204,6 +216,24 @@ export function ApplicantsDialog({ job, open, onOpenChange, onUpdate }: Applican
                   <div className="flex items-center gap-2">
                     <Progress value={selectedApplicant.behavioural_score ?? 0} className="flex-1 h-2" />
                     <span className="font-semibold text-sm">{selectedApplicant.behavioural_score ?? '—'}{selectedApplicant.behavioural_score != null ? '%' : ''}</span>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm font-medium mb-2">Combined Score</p>
+                  <div className="flex items-center gap-2">
+                    <Progress value={selectedApplicant.combined_score ?? 0} className="flex-1 h-2" />
+                    <span className="font-semibold text-sm">{selectedApplicant.combined_score ?? '—'}{selectedApplicant.combined_score != null ? '%' : ''}</span>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm font-medium mb-2">Fit Score</p>
+                  <div className="flex items-center gap-2">
+                    <Progress value={selectedApplicant.fit_score ?? 0} className="flex-1 h-2" />
+                    <span className="font-semibold text-sm">{selectedApplicant.fit_score ?? '—'}{selectedApplicant.fit_score != null ? '%' : ''}</span>
                   </div>
                 </CardContent>
               </Card>
