@@ -25,6 +25,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
+import { formatScorePercent, scoreToProgressValue } from '@/lib/score';
 import { FileCheck, CheckCircle, XCircle, Briefcase, TrendingUp, Eye } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
@@ -213,6 +214,10 @@ export function CandidateDashboard() {
                   const scoreColor = (v: number) =>
                     v >= 80 ? 'text-green-600 dark:text-green-400' :
                     v >= 60 ? 'text-primary' : 'text-orange-500';
+                  const resumeScore = scoreToProgressValue(applicant.resume_score);
+                  const behaviouralScore = scoreToProgressValue(applicant.behavioural_score);
+                  const combinedScore = scoreToProgressValue(applicant.combined_score);
+                  const fitScore = scoreToProgressValue(applicant.fit_score);
                   return (
                     <TableRow key={applicant.id}>
                       <TableCell className="font-medium">
@@ -225,11 +230,11 @@ export function CandidateDashboard() {
                         {applicant.resume_score != null ? (
                           <div className="space-y-1">
                             <div className="flex justify-between text-xs">
-                              <span className={`font-semibold ${scoreColor(applicant.resume_score)}`}>
-                                {applicant.resume_score}%
+                              <span className={`font-semibold ${scoreColor(resumeScore)}`}>
+                                {formatScorePercent(applicant.resume_score)}
                               </span>
                             </div>
-                            <Progress value={applicant.resume_score} className="h-1.5 w-24" />
+                            <Progress value={resumeScore} className="h-1.5 w-24" />
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">Pending</span>
@@ -241,11 +246,11 @@ export function CandidateDashboard() {
                         {applicant.behavioural_score != null ? (
                           <div className="space-y-1">
                             <div className="flex justify-between text-xs">
-                              <span className={`font-semibold ${scoreColor(applicant.behavioural_score)}`}>
-                                {applicant.behavioural_score}%
+                              <span className={`font-semibold ${scoreColor(behaviouralScore)}`}>
+                                {formatScorePercent(applicant.behavioural_score)}
                               </span>
                             </div>
-                            <Progress value={applicant.behavioural_score} className="h-1.5 w-24" />
+                            <Progress value={behaviouralScore} className="h-1.5 w-24" />
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">Pending</span>
@@ -257,11 +262,11 @@ export function CandidateDashboard() {
                         {applicant.combined_score != null ? (
                           <div className="space-y-1">
                             <div className="flex justify-between text-xs">
-                              <span className={`font-semibold ${scoreColor(applicant.combined_score)}`}>
-                                {applicant.combined_score}%
+                              <span className={`font-semibold ${scoreColor(combinedScore)}`}>
+                                {formatScorePercent(applicant.combined_score)}
                               </span>
                             </div>
-                            <Progress value={applicant.combined_score} className="h-1.5 w-24" />
+                            <Progress value={combinedScore} className="h-1.5 w-24" />
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">Pending</span>
@@ -273,11 +278,11 @@ export function CandidateDashboard() {
                         {applicant.fit_score != null ? (
                           <div className="space-y-1">
                             <div className="flex justify-between text-xs">
-                              <span className={`font-bold ${scoreColor(applicant.fit_score)}`}>
-                                {applicant.fit_score}%
+                              <span className={`font-bold ${scoreColor(fitScore)}`}>
+                                {formatScorePercent(applicant.fit_score)}
                               </span>
                             </div>
-                            <Progress value={applicant.fit_score} className="h-1.5 w-24" />
+                            <Progress value={fitScore} className="h-1.5 w-24" />
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">Pending</span>
@@ -333,28 +338,22 @@ export function CandidateDashboard() {
                 <div className="bg-muted/30 rounded-lg p-3 text-center border">
                   <p className="text-xs text-muted-foreground mb-1">Fit Score</p>
                   <p className={`text-xl font-bold ${
-                    (selectedApplication.applicant.fit_score ?? 0) >= 80 ? 'text-success' :
-                    (selectedApplication.applicant.fit_score ?? 0) >= 60 ? 'text-primary' : 'text-warning'
+                    scoreToProgressValue(selectedApplication.applicant.fit_score) >= 80 ? 'text-success' :
+                    scoreToProgressValue(selectedApplication.applicant.fit_score) >= 60 ? 'text-primary' : 'text-warning'
                   }`}>
-                    {selectedApplication.applicant.fit_score != null
-                      ? `${selectedApplication.applicant.fit_score}%`
-                      : '—'}
+                    {formatScorePercent(selectedApplication.applicant.fit_score)}
                   </p>
                 </div>
                 <div className="bg-muted/30 rounded-lg p-3 text-center border">
                   <p className="text-xs text-muted-foreground mb-1">Resume</p>
                   <p className="text-xl font-bold text-primary">
-                    {selectedApplication.applicant.resume_score != null
-                      ? `${selectedApplication.applicant.resume_score}%`
-                      : '—'}
+                    {formatScorePercent(selectedApplication.applicant.resume_score)}
                   </p>
                 </div>
                 <div className="bg-muted/30 rounded-lg p-3 text-center border">
                   <p className="text-xs text-muted-foreground mb-1">Behaviour</p>
                   <p className="text-xl font-bold text-primary">
-                    {selectedApplication.applicant.behavioural_score != null
-                      ? `${selectedApplication.applicant.behavioural_score}%`
-                      : '—'}
+                    {formatScorePercent(selectedApplication.applicant.behavioural_score)}
                   </p>
                 </div>
               </div>
@@ -369,14 +368,14 @@ export function CandidateDashboard() {
                   <div key={label} className="flex items-center gap-3">
                     <span className="text-sm w-36 shrink-0 text-muted-foreground">{label}</span>
                     <Progress
-                      value={value ?? 0}
+                      value={scoreToProgressValue(value)}
                       className="flex-1 h-2"
                     />
-                    <span className={`text-sm font-semibold w-10 text-right ${
-                      (value ?? 0) >= 80 ? 'text-green-600 dark:text-green-400' :
-                      (value ?? 0) >= 60 ? 'text-primary' : 'text-orange-500'
+                    <span className={`text-sm font-semibold w-12 text-right ${
+                      scoreToProgressValue(value) >= 80 ? 'text-green-600 dark:text-green-400' :
+                      scoreToProgressValue(value) >= 60 ? 'text-primary' : 'text-orange-500'
                     }`}>
-                      {value != null ? `${value}%` : '—'}
+                      {formatScorePercent(value)}
                     </span>
                   </div>
                 ))}

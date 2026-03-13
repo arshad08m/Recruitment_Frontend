@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { formatScorePercent, normalizeScoreToPercent } from '@/lib/score';
 
 interface FitScoreGaugeProps {
   score: number;
@@ -20,6 +21,10 @@ export const FitScoreGauge: React.FC<FitScoreGaugeProps> = ({
   size = 'md',
   className 
 }) => {
+  const normalizedScore = normalizeScoreToPercent(score) ?? 0;
+  const normalizedResumeScore = normalizeScoreToPercent(resumeScore) ?? 0;
+  const normalizedBehaviourScore = normalizeScoreToPercent(behaviourScore) ?? 0;
+
   const sizeClasses = {
     sm: 'w-20 h-20',
     md: 'w-28 h-28',
@@ -47,7 +52,7 @@ export const FitScoreGauge: React.FC<FitScoreGaugeProps> = ({
   };
 
   const circumference = 2 * Math.PI * 40;
-  const offset = circumference - (score / 100) * circumference;
+  const offset = circumference - (normalizedScore / 100) * circumference;
 
   return (
     <div className={cn('flex flex-col items-center', className)}>
@@ -78,26 +83,26 @@ export const FitScoreGauge: React.FC<FitScoreGaugeProps> = ({
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={cn('font-bold', textSizeClasses[size], getScoreColor(score))}>
-            {score}%
+          <span className={cn('font-bold', textSizeClasses[size], getScoreColor(normalizedScore))}>
+            {formatScorePercent(normalizedScore)}
           </span>
           <span className="text-xs text-muted-foreground">Fit Score</span>
         </div>
       </div>
 
-      <p className={cn('text-sm font-medium mt-2', getScoreColor(score))}>
-        {getScoreLabel(score)}
+      <p className={cn('text-sm font-medium mt-2', getScoreColor(normalizedScore))}>
+        {getScoreLabel(normalizedScore)}
       </p>
 
       {/* Breakdown */}
       <div className="mt-3 w-full space-y-1.5 text-xs">
         <div className="flex justify-between items-center">
           <span className="text-muted-foreground">Resume ({resumeWeight}%)</span>
-          <span className="font-medium">{resumeScore}%</span>
+          <span className="font-medium">{formatScorePercent(normalizedResumeScore)}</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-muted-foreground">Behaviour ({behaviourWeight}%)</span>
-          <span className="font-medium">{behaviourScore}%</span>
+          <span className="font-medium">{formatScorePercent(normalizedBehaviourScore)}</span>
         </div>
       </div>
     </div>

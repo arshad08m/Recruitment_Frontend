@@ -14,6 +14,7 @@ import { FitScoreGauge } from '@/components/FitScoreGauge';
 import { User, Calendar, CheckCircle, XCircle, Edit, Loader2 } from 'lucide-react';
 import { applicationsAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { formatScorePercent, scoreToProgressValue } from '@/lib/score';
 
 interface ApplicantsDialogProps {
   job: Job | null;
@@ -60,7 +61,9 @@ export function ApplicantsDialog({ job, open, onOpenChange, onUpdate }: Applican
     }
   };
 
-  const sortedApplicants = [...applicants].sort((a, b) => (b.combined_score ?? 0) - (a.combined_score ?? 0));
+  const sortedApplicants = [...applicants].sort(
+    (a, b) => scoreToProgressValue(b.combined_score) - scoreToProgressValue(a.combined_score),
+  );
 
   const handleStatusUpdate = async (status: 'Shortlisted' | 'Rejected') => {
     if (!selectedApplicant) return;
@@ -154,21 +157,19 @@ export function ApplicantsDialog({ job, open, onOpenChange, onUpdate }: Applican
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <p className={`text-2xl font-bold ${
-                            (applicant.combined_score ?? 0) >= 80 ? 'text-success' :
-                            (applicant.combined_score ?? 0) >= 60 ? 'text-primary' : 'text-warning'
+                            scoreToProgressValue(applicant.combined_score) >= 80 ? 'text-success' :
+                            scoreToProgressValue(applicant.combined_score) >= 60 ? 'text-primary' : 'text-warning'
                           }`}>
-                            {applicant.combined_score ?? '—'}
-                            {applicant.combined_score != null ? '%' : ''}
+                            {formatScorePercent(applicant.combined_score)}
                           </p>
                           <p className="text-xs text-muted-foreground">Combined</p>
                         </div>
                         <div className="text-right">
                           <p className={`text-lg font-bold ${
-                            (applicant.fit_score ?? 0) >= 80 ? 'text-success' :
-                            (applicant.fit_score ?? 0) >= 60 ? 'text-primary' : 'text-warning'
+                            scoreToProgressValue(applicant.fit_score) >= 80 ? 'text-success' :
+                            scoreToProgressValue(applicant.fit_score) >= 60 ? 'text-primary' : 'text-warning'
                           }`}>
-                            {applicant.fit_score ?? '—'}
-                            {applicant.fit_score != null ? '%' : ''}
+                            {formatScorePercent(applicant.fit_score)}
                           </p>
                           <p className="text-xs text-muted-foreground">Fit</p>
                         </div>
@@ -205,8 +206,8 @@ export function ApplicantsDialog({ job, open, onOpenChange, onUpdate }: Applican
                 <CardContent className="p-4">
                   <p className="text-sm font-medium mb-2">Resume Score</p>
                   <div className="flex items-center gap-2">
-                    <Progress value={selectedApplicant.resume_score ?? 0} className="flex-1 h-2" />
-                    <span className="font-semibold text-sm">{selectedApplicant.resume_score ?? '—'}{selectedApplicant.resume_score != null ? '%' : ''}</span>
+                    <Progress value={scoreToProgressValue(selectedApplicant.resume_score)} className="flex-1 h-2" />
+                    <span className="font-semibold text-sm">{formatScorePercent(selectedApplicant.resume_score)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -214,8 +215,8 @@ export function ApplicantsDialog({ job, open, onOpenChange, onUpdate }: Applican
                 <CardContent className="p-4">
                   <p className="text-sm font-medium mb-2">Behavioural Score</p>
                   <div className="flex items-center gap-2">
-                    <Progress value={selectedApplicant.behavioural_score ?? 0} className="flex-1 h-2" />
-                    <span className="font-semibold text-sm">{selectedApplicant.behavioural_score ?? '—'}{selectedApplicant.behavioural_score != null ? '%' : ''}</span>
+                    <Progress value={scoreToProgressValue(selectedApplicant.behavioural_score)} className="flex-1 h-2" />
+                    <span className="font-semibold text-sm">{formatScorePercent(selectedApplicant.behavioural_score)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -223,8 +224,8 @@ export function ApplicantsDialog({ job, open, onOpenChange, onUpdate }: Applican
                 <CardContent className="p-4">
                   <p className="text-sm font-medium mb-2">Combined Score</p>
                   <div className="flex items-center gap-2">
-                    <Progress value={selectedApplicant.combined_score ?? 0} className="flex-1 h-2" />
-                    <span className="font-semibold text-sm">{selectedApplicant.combined_score ?? '—'}{selectedApplicant.combined_score != null ? '%' : ''}</span>
+                    <Progress value={scoreToProgressValue(selectedApplicant.combined_score)} className="flex-1 h-2" />
+                    <span className="font-semibold text-sm">{formatScorePercent(selectedApplicant.combined_score)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -232,8 +233,8 @@ export function ApplicantsDialog({ job, open, onOpenChange, onUpdate }: Applican
                 <CardContent className="p-4">
                   <p className="text-sm font-medium mb-2">Fit Score</p>
                   <div className="flex items-center gap-2">
-                    <Progress value={selectedApplicant.fit_score ?? 0} className="flex-1 h-2" />
-                    <span className="font-semibold text-sm">{selectedApplicant.fit_score ?? '—'}{selectedApplicant.fit_score != null ? '%' : ''}</span>
+                    <Progress value={scoreToProgressValue(selectedApplicant.fit_score)} className="flex-1 h-2" />
+                    <span className="font-semibold text-sm">{formatScorePercent(selectedApplicant.fit_score)}</span>
                   </div>
                 </CardContent>
               </Card>

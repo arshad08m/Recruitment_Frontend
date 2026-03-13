@@ -16,6 +16,7 @@ import {
 import { ArrowLeft, ArrowRight, Upload, Loader2, Clock, CheckCircle, AlertTriangle, Brain, FileText, TrendingUp, User, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { resumeAPI, applicationsAPI, behaviouralAPI } from '@/lib/api';
+import { formatScorePercent, scoreToProgressValue } from '@/lib/score';
 
 interface ApplicationFlowProps {
   job: Job | null;
@@ -299,10 +300,10 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold">Overall Match Score</span>
                   <span className="text-2xl font-bold text-primary">
-                    {Math.round(analysis.scores.final_weighted_score)}%
+                    {formatScorePercent(analysis.scores.final_weighted_score)}
                   </span>
                 </div>
-                <Progress value={analysis.scores.final_weighted_score} className="h-2" />
+                <Progress value={scoreToProgressValue(analysis.scores.final_weighted_score)} className="h-2" />
                 <p className="text-xs text-muted-foreground mt-1">
                   Candidate: {analysis.candidate_name} — Role: {analysis.job_title}
                 </p>
@@ -324,9 +325,9 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
                     <div key={label} className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground">{label}</span>
-                        <span className="font-medium">{Math.round(value)}%</span>
+                        <span className="font-medium">{formatScorePercent(value)}</span>
                       </div>
-                      <Progress value={value} className="h-1.5" />
+                      <Progress value={scoreToProgressValue(value)} className="h-1.5" />
                     </div>
                   ))}
                 </div>
@@ -494,22 +495,22 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold">Overall Fit Score</span>
                     <span className="text-2xl font-bold text-primary">
-                      {Math.round(submitResult.combined_score)}%
+                      {formatScorePercent(submitResult.combined_score)}
                     </span>
                   </div>
-                  <Progress value={submitResult.combined_score} className="h-2" />
+                  <Progress value={scoreToProgressValue(submitResult.combined_score)} className="h-2" />
                   <div className="grid grid-cols-3 gap-2 mt-3">
                     <div className="text-center">
                       <p className="text-xs text-muted-foreground">Resume</p>
-                      <p className="font-semibold text-sm">{Math.round(submitResult.resume_score)}%</p>
+                      <p className="font-semibold text-sm">{formatScorePercent(submitResult.resume_score)}</p>
                     </div>
                     <div className="text-center">
                       <p className="text-xs text-muted-foreground">Behavioural</p>
-                      <p className="font-semibold text-sm">{Math.round(submitResult.behavioural_score * 100)}%</p>
+                      <p className="font-semibold text-sm">{formatScorePercent(submitResult.behavioural_score)}</p>
                     </div>
                     <div className="text-center">
                       <p className="text-xs text-muted-foreground">Fit Score</p>
-                      <p className="font-semibold text-sm">{Math.round(submitResult.fit_score * 100)}%</p>
+                      <p className="font-semibold text-sm">{formatScorePercent(submitResult.fit_score)}</p>
                     </div>
                   </div>
                 </div>
@@ -525,10 +526,10 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
                         <span className="font-semibold">Behavioural Score</span>
                       </div>
                       <span className="text-2xl font-bold text-primary">
-                        {Math.round(behaviouralResult.behavioural_score * 100)}%
+                        {formatScorePercent(behaviouralResult.behavioural_score)}
                       </span>
                     </div>
-                    <Progress value={behaviouralResult.behavioural_score * 100} className="h-2" />
+                    <Progress value={scoreToProgressValue(behaviouralResult.behavioural_score)} className="h-2" />
                     <p className="text-xs text-muted-foreground mt-1 capitalize">
                       Sentiment: {behaviouralResult.sentiment.label} ({behaviouralResult.sentiment.polarity.toFixed(2)})
                     </p>
@@ -545,9 +546,9 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
                         <div key={trait} className="space-y-1">
                           <div className="flex justify-between text-xs">
                             <span className="text-muted-foreground capitalize">{trait}</span>
-                            <span className="font-medium">{Math.round((value as number) * 100)}%</span>
+                            <span className="font-medium">{formatScorePercent(value as number)}</span>
                           </div>
-                          <Progress value={(value as number) * 100} className="h-1.5" />
+                          <Progress value={scoreToProgressValue(value as number)} className="h-1.5" />
                         </div>
                       ))}
                     </div>
@@ -564,9 +565,9 @@ export const ApplicationFlow = React.forwardRef<HTMLDivElement, ApplicationFlowP
                         <div key={skill} className="space-y-1">
                           <div className="flex justify-between text-xs">
                             <span className="text-muted-foreground capitalize">{skill.replace('_', ' ')}</span>
-                            <span className="font-medium">{Math.round((value as number) * 100)}%</span>
+                            <span className="font-medium">{formatScorePercent(value as number)}</span>
                           </div>
-                          <Progress value={(value as number) * 100} className="h-1.5" />
+                          <Progress value={scoreToProgressValue(value as number)} className="h-1.5" />
                         </div>
                       ))}
                     </div>
